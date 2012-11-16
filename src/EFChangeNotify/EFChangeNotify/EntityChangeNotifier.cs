@@ -14,6 +14,7 @@ namespace EFChangeNotify
     {
         private DbContext _context;
         private Expression<Func<TEntity, bool>> _query;
+        private string _connectionString;
 
         public event EventHandler<EntityChangeEventArgs<TEntity>> Changed;
         public event EventHandler<NotifierErrorEventArgs> Error;
@@ -22,8 +23,9 @@ namespace EFChangeNotify
         {
             _context = new TDbContext();
             _query = query;
+            _connectionString = _context.Database.Connection.ConnectionString;
 
-            SafeCountDictionary.Increment(_context.Database.Connection.ConnectionString, x => { SqlDependency.Start(x); });
+            SafeCountDictionary.Increment(_connectionString, x => { SqlDependency.Start(x); });
 
             RegisterNotification();
         }
@@ -32,7 +34,7 @@ namespace EFChangeNotify
         {
             _context = new TDbContext();
 
-            using (SqlConnection connection = new SqlConnection(_context.Database.Connection.ConnectionString))
+            using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 using (SqlCommand command = GetCommand())
                 {
@@ -73,22 +75,13 @@ namespace EFChangeNotify
         {
             if (e.Type == SqlNotificationType.Subscribe || e.Info == SqlNotificationInfo.Error)
             {
-                OnError(
-                    new NotifierErrorEventArgs
-                    {
-                        Reason = e,
-                        Sql = GetSql()
-                    }
-                );
+                var args = new NotifierErrorEventArgs { Reason = e, Sql = GetSql() };
+
+                OnError(args);
             }
             else
             {
-                var args =
-                    new EntityChangeEventArgs<TEntity>
-                    {
-                        Results = GetCurrent(),
-                        ContinueListening = true
-                    };
+                var args = new EntityChangeEventArgs<TEntity> { Results = GetCurrent(), ContinueListening = true };
 
                 OnChanged(args);
 
@@ -119,11 +112,12 @@ namespace EFChangeNotify
         {
             if (disposing)
             {
-                SafeCountDictionary.Decrement(_context.Database.Connection.ConnectionString, x => { SqlDependency.Stop(x); });
+                SafeCountDictionary.Decrement(_connectionString, x => { SqlDependency.Stop(x); });
 
                 if (_context != null)
                 {
                     _context.Dispose();
+                    _context = null;
                 }
             }
         }
