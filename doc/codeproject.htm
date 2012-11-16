@@ -1,0 +1,75 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+		<title>The Code Project</title>
+		<style type="text/css">
+BODY, P, TD { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; max-width: 730px }
+H2,H3,H4,H5 { color: #ff9900; font-weight: bold; }
+H2 { font-size: 13pt; }
+H3 { font-size: 12pt; }
+H4 { font-size: 10pt; color: black; }
+PRE { BACKGROUND-COLOR: #FBEDBB; FONT-FAMILY: "Courier New", Courier, mono; WHITE-SPACE: pre; }
+CODE { COLOR: #990000; FONT-FAMILY: "Courier New", Courier, mono; }		</style>
+		<link href="http://www.codeproject.com/App_Themes/Std/CodeProject.css" rel="stylesheet" type="text/css" />
+	</head>
+	<body bgcolor="#FFFFFF" color="#000000">
+		<!---------------------------------------------------------------------------><!-------------------------------     STEP 1      ---------------------------><!--  Fill in the details (CodeProject will reformat this section for you) -->
+		<pre>
+Title:       Enter Article Title Here
+Author:      Enter your Code Project User Name (or suggest one if you&#39;re not a member)
+Email:       Enter your Code Project E-mail Login (or the email you wish to use if not a member)
+Language:    Enter the Languages that Apply to Your Article (C# 3.0, etc.)
+Platform:    Enter the Platforms that Apply to Your Article (Windows, etc.)
+Technology:  Enter the Technologies that Apply to Your Article (WPF, etc.)
+Level:       Pick ONE: Beginner/Intermediate/Advanced
+Description: Enter a brief description of your article
+Section      Enter the Code Project Section you Wish the Article to Appear
+SubSection   Enter the Code Project SubSection you Wish the Article to Appear
+License:     Enter the license (<a href="http://www.codeproject.com/info/licenses.aspx">CPOL, CPL, MIT, etc</a>)
+</pre>
+		<!-------------------------------     STEP 2      ---------------------------><!--  Include download and sample image information.                       --><!-------------------------------     STEP 3      ---------------------------><!--  Add the article text. Please use simple formatting (<h2>, <p> etc)   -->
+		<h2>
+			Introduction</h2>
+		<p>
+			This article will show you how to subscribe to data using the Entity Framework. You will be able to use this method to have your application notified whenever there is a change to the results of a query, without having to poll your database. Along the way we will learn some concepts about reflection, Expressions, and a little about the internals of the Entity Framework.</p>
+		<h2>
+			Background</h2>
+		<p>
+			Entity Framework</p>
+		<p>
+			SqlDependency</p>
+		<p>
+			Reflection</p>
+		<h2>
+			Using the code</h2>
+		<p>
+			At the end of this article, you should be able to use the following to have your application notified any time a product with a Name of &quot;Lamp&quot; is created or deleted. Basically, any time the results of the query would chnage:</p>
+		<pre>
+using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(p =&gt; p.Name == &quot;Lamp&quot;))
+{
+    notifer.Changed += (sender, e) =&gt;
+    {
+        Console.WriteLine(e.Results.Count());
+        foreach (var p in e.Results)
+        {
+            Console.WriteLine(&quot;  {0}&quot;, p.Name);
+        }
+    };
+
+    Console.WriteLine(&quot;Press any key to stop...&quot;);
+    Console.ReadKey(true);
+}</pre>
+		<p>
+			Remember to set the Language of your code snippet using the Language dropdown.</p>
+		<p>
+			Use the &quot;var&quot; button to wrap Variable or class names in &amp;lt;code&amp;gt; tags like <code>this</code>.</p>
+		<h2>
+			Points of Interest</h2>
+		<p>
+			Did you learn anything interesting/fun/annoying while writing the code? Did you do anything particularly clever or wild or zany?</p>
+		<h2>
+			History</h2>
+		<p>
+			Keep a running update of any changes or improvements you&#39;ve made here.</p>
+		<!-------------------------------    That's it!   ---------------------------></body>
+</html>
