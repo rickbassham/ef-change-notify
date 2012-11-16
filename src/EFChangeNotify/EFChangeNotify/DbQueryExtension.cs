@@ -11,25 +11,31 @@ namespace EFChangeNotify
 {
     public static class DbQueryExtension
     {
-        /// <summary>
-        /// Returns the SqlCommand that represents the given DbQuery.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="query"></param>
-        /// <returns></returns>
+        public static ObjectQuery<T> ToObjectQuery<T>(this DbQuery<T> query)
+        {
+            var internalQuery = query.GetType()
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(field => field.Name == "_internalQuery")
+                .Select(field => field.GetValue(query))
+                .First();
+
+            var objectQuery = internalQuery.GetType()
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(field => field.Name == "_objectQuery")
+                .Select(field => field.GetValue(internalQuery))
+                .Cast<ObjectQuery<T>>()
+                .First();
+
+            return objectQuery;
+        }
+
         public static SqlCommand ToSqlCommand<T>(this DbQuery<T> query)
         {
             SqlCommand command = new SqlCommand();
 
             command.CommandText = query.ToString();
 
-            var internalQueryField = query.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(f => f.Name.Equals("_internalQuery")).FirstOrDefault();
-
-            var internalQuery = internalQueryField.GetValue(query);
-
-            var objectQueryField = internalQuery.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(f => f.Name.Equals("_objectQuery")).FirstOrDefault();
-
-            var objectQuery = objectQueryField.GetValue(internalQuery) as ObjectQuery<T>;
+            var objectQuery = query.ToObjectQuery();
 
             foreach (var param in objectQuery.Parameters)
             {
@@ -39,17 +45,9 @@ namespace EFChangeNotify
             return command;
         }
 
-        // The two methods below were found at: 
-        // http://social.msdn.microsoft.com/Forums/en-US/adodotnetentityframework/thread/91c7fb6d-d1b8-4a7f-aec9-16336dbd619b/
         public static string ToTraceString<T>(this DbQuery<T> query)
         {
-            var internalQueryField = query.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(f => f.Name.Equals("_internalQuery")).FirstOrDefault();
-
-            var internalQuery = internalQueryField.GetValue(query);
-
-            var objectQueryField = internalQuery.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(f => f.Name.Equals("_objectQuery")).FirstOrDefault();
-
-            var objectQuery = objectQueryField.GetValue(internalQuery) as ObjectQuery<T>;
+            var objectQuery = query.ToObjectQuery();
 
             return objectQuery.ToTraceStringWithParameters();
         }

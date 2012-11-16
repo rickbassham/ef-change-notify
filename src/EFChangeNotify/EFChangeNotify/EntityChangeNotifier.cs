@@ -32,8 +32,6 @@ namespace EFChangeNotify
         {
             _context = new TDbContext();
 
-            string sql = GetSql();
-
             using (SqlConnection connection = new SqlConnection(_context.Database.Connection.ConnectionString))
             {
                 using (SqlCommand command = GetCommand())
@@ -71,22 +69,6 @@ namespace EFChangeNotify
             return _context.Set<TEntity>().Where(_query) as DbQuery<TEntity>;
         }
 
-        protected virtual void OnChanged(EntityChangeEventArgs<TEntity> e)
-        {
-            if (Changed != null)
-            {
-                Changed(this, e);
-            }
-        }
-
-        protected virtual void OnError(NotifierErrorEventArgs e)
-        {
-            if (Error != null)
-            {
-                Error(this, e);
-            }
-        }
-
         private void _sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
         {
             if (e.Type == SqlNotificationType.Subscribe || e.Info == SqlNotificationInfo.Error)
@@ -117,9 +99,39 @@ namespace EFChangeNotify
             }
         }
 
+        protected virtual void OnChanged(EntityChangeEventArgs<TEntity> e)
+        {
+            if (Changed != null)
+            {
+                Changed(this, e);
+            }
+        }
+
+        protected virtual void OnError(NotifierErrorEventArgs e)
+        {
+            if (Error != null)
+            {
+                Error(this, e);
+            }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                SafeCountDictionary.Decrement(_context.Database.Connection.ConnectionString, x => { SqlDependency.Stop(x); });
+
+                if (_context != null)
+                {
+                    _context.Dispose();
+                }
+            }
+        }
+
         public void Dispose()
         {
-            SafeCountDictionary.Decrement(_context.Database.Connection.ConnectionString, x => { SqlDependency.Stop(x); });
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }
