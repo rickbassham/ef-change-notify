@@ -2,6 +2,7 @@
 using System.Linq;
 using EFChangeNotify;
 using TestConsole.Models;
+using System.Data.Entity.Infrastructure;
 
 namespace TestConsole
 {
@@ -9,7 +10,9 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-            using (var notifer = new EntityChangeNotifier<Product, StoreDbContext>(p => p.Name == "Lamp"))
+            string productName = "Lamp";
+
+            using (var notifer = new EntityChangeNotifier<Product, StoreDbContext>(p => p.Name == productName))
             {
                 notifer.Error += (sender, e) =>
                 {
@@ -24,6 +27,17 @@ namespace TestConsole
                         Console.WriteLine("  {0}", p.Name);
                     }
                 };
+
+                using (var otherNotifier = new EntityChangeNotifier<Product, StoreDbContext>(x => x.Name == "Desk"))
+                {
+                    otherNotifier.Changed += (sender, e) =>
+                    {
+                        Console.WriteLine(e.Results.Count());
+                    };
+
+                    Console.WriteLine("Press any key to stop listening for changes...");
+                    Console.ReadKey(true);
+                }
 
                 Console.WriteLine("Press any key to stop...");
                 Console.ReadKey(true);

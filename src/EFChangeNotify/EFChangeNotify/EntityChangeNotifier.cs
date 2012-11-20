@@ -68,20 +68,33 @@ namespace EFChangeNotify
 
         private DbQuery<TEntity> GetCurrent()
         {
-            return _context.Set<TEntity>().Where(_query) as DbQuery<TEntity>;
+            var query = _context.Set<TEntity>().Where(_query) as DbQuery<TEntity>;
+
+            return query;
         }
 
         private void _sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
         {
+            if (_context == null)
+                return;
+
             if (e.Type == SqlNotificationType.Subscribe || e.Info == SqlNotificationInfo.Error)
             {
-                var args = new NotifierErrorEventArgs { Reason = e, Sql = GetSql() };
+                var args = new NotifierErrorEventArgs
+                {
+                    Reason = e,
+                    Sql = GetCurrent().ToString()
+                };
 
                 OnError(args);
             }
             else
             {
-                var args = new EntityChangeEventArgs<TEntity> { Results = GetCurrent(), ContinueListening = true };
+                var args = new EntityChangeEventArgs<TEntity>
+                {
+                    Results = GetCurrent(),
+                    ContinueListening = true
+                };
 
                 OnChanged(args);
 
