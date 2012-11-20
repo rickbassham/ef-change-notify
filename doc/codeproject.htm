@@ -1,75 +1,698 @@
-﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-	<head>
-		<title>The Code Project</title>
-		<style type="text/css">
-BODY, P, TD { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10pt; max-width: 730px }
-H2,H3,H4,H5 { color: #ff9900; font-weight: bold; }
-H2 { font-size: 13pt; }
-H3 { font-size: 12pt; }
-H4 { font-size: 10pt; color: black; }
-PRE { BACKGROUND-COLOR: #FBEDBB; FONT-FAMILY: "Courier New", Courier, mono; WHITE-SPACE: pre; }
-CODE { COLOR: #990000; FONT-FAMILY: "Courier New", Courier, mono; }		</style>
-		<link href="http://www.codeproject.com/App_Themes/Std/CodeProject.css" rel="stylesheet" type="text/css" />
-	</head>
-	<body bgcolor="#FFFFFF" color="#000000">
-		<!---------------------------------------------------------------------------><!-------------------------------     STEP 1      ---------------------------><!--  Fill in the details (CodeProject will reformat this section for you) -->
-		<pre>
-Title:       Enter Article Title Here
-Author:      Enter your Code Project User Name (or suggest one if you&#39;re not a member)
-Email:       Enter your Code Project E-mail Login (or the email you wish to use if not a member)
-Language:    Enter the Languages that Apply to Your Article (C# 3.0, etc.)
-Platform:    Enter the Platforms that Apply to Your Article (Windows, etc.)
-Technology:  Enter the Technologies that Apply to Your Article (WPF, etc.)
-Level:       Pick ONE: Beginner/Intermediate/Advanced
-Description: Enter a brief description of your article
-Section      Enter the Code Project Section you Wish the Article to Appear
-SubSection   Enter the Code Project SubSection you Wish the Article to Appear
-License:     Enter the license (<a href="http://www.codeproject.com/info/licenses.aspx">CPOL, CPL, MIT, etc</a>)
-</pre>
-		<!-------------------------------     STEP 2      ---------------------------><!--  Include download and sample image information.                       --><!-------------------------------     STEP 3      ---------------------------><!--  Add the article text. Please use simple formatting (<h2>, <p> etc)   -->
-		<h2>
-			Introduction</h2>
-		<p>
-			This article will show you how to subscribe to data using the Entity Framework. You will be able to use this method to have your application notified whenever there is a change to the results of a query, without having to poll your database. Along the way we will learn some concepts about reflection, Expressions, and a little about the internals of the Entity Framework.</p>
-		<h2>
-			Background</h2>
-		<p>
-			Entity Framework</p>
-		<p>
-			SqlDependency</p>
-		<p>
-			Reflection</p>
-		<h2>
-			Using the code</h2>
-		<p>
-			At the end of this article, you should be able to use the following to have your application notified any time a product with a Name of &quot;Lamp&quot; is created or deleted. Basically, any time the results of the query would chnage:</p>
-		<pre>
-using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(p =&gt; p.Name == &quot;Lamp&quot;))
+<h2>
+  Introduction
+</h2>
+<p>
+  This article will show you how to subscribe to data changes using Entity Framework 5.0. You will be able to use this method to have your application notified whenever there is a change to the results of a query, without having to constantly poll your database. Along the way we will learn some concepts about reflection, Expressions, and a little about the internals of the Entity Framework.
+</p>
+<h2>
+  Background
+</h2>
+<p>
+  This article assumes you are familiar with the <a href="http://msdn.microsoft.com/en-us/data/ef.aspx">Entity Framework</a> and how to create a basic <a href="http://weblogs.asp.net/scottgu/archive/2010/07/16/code-first-development-with-entity-framework-4.aspx">Code-First</a> application. It also assumes you have some knowledge of <a href="http://en.wikipedia.org/wiki/Reflection_(computer_programming)">reflection</a> and <a href="http://www.codeproject.com/Articles/55710/Reflection-in-NET">how it works in the .Net framework</a>.
+</p>
+<h2>
+  Using the code
+</h2>
+<p>
+  At the end of this article, you should be able to use the following to have your application notified any time a product with a Name of "Lamp" is created or deleted. Basically, any time the results of the query would chnage:
+</p>
+<pre>
+using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(p =&gt; p.Name == "Lamp"))
 {
     notifer.Changed += (sender, e) =&gt;
     {
         Console.WriteLine(e.Results.Count());
         foreach (var p in e.Results)
         {
-            Console.WriteLine(&quot;  {0}&quot;, p.Name);
+            Console.WriteLine("  {0}", p.Name);
         }
     };
 
-    Console.WriteLine(&quot;Press any key to stop...&quot;);
+    Console.WriteLine("Press any key to stop...");
     Console.ReadKey(true);
-}</pre>
-		<p>
-			Remember to set the Language of your code snippet using the Language dropdown.</p>
-		<p>
-			Use the &quot;var&quot; button to wrap Variable or class names in &amp;lt;code&amp;gt; tags like <code>this</code>.</p>
-		<h2>
-			Points of Interest</h2>
-		<p>
-			Did you learn anything interesting/fun/annoying while writing the code? Did you do anything particularly clever or wild or zany?</p>
-		<h2>
-			History</h2>
-		<p>
-			Keep a running update of any changes or improvements you&#39;ve made here.</p>
-		<!-------------------------------    That's it!   ---------------------------></body>
-</html>
+}
+</pre>
+<h2>
+  Warning
+</h2>
+<p>
+  This code makes use of undocumented parts of the Entity Framework, and as such, the EF team may change these without notice, causing any application using this approach to break, possibly very badly. Do NOT use this in ANY environment without understanding this risk.
+</p>
+<h2>
+  SqlDependency
+</h2>
+<p>
+  The basis for this approach is the <code><a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqldependency.aspx">SqlDependency</a></code> class. This class is used to represent a query notification between an application and an instance of SQL Server. The basic operation of this class is as follows: first, you need to notify SQL Server that you will be using query notifications; then we will register the query we want notifications for; finally, we notify SQL Server we no longer need notifications, to clean everything up. Note: There are strict rules for what types of queries can be registered for notification. See <a href="http://msdn.microsoft.com/library/ms181122.aspx">Creating a Query for Notification</a> on MSDN for a list of these rules.
+</p>
+<h4>
+  Notifying SQL Server we are going to use query notifications:
+</h4>
+<pre>
+string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+
+SqlDependency.Start(connectionString);
+</pre>
+<p>
+  <code><a href="http://msdn.microsoft.com/en-us/library/ms224872.aspx">SqlDependecy.Start</a></code> is the method used to notify SQL Server we will be using query notifications. This creates the Service Broker Queue on the database and starts the listener for the current AppDomain for receiving dependency notifications from SQL Server.
+</p>
+<h4>
+  Registering our Query:
+</h4>
+<pre>
+static void RegisterNotification()
+{
+    string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+    string commandText = @"
+Select
+    dbo.Products.Id,
+    dbo.Products.Name,
+    dbo.Products.LastEditDate
+From
+    dbo.Products
+Where
+    dbo.Products.Name = 'Lamp'
+";
+
+    using (SqlConnection connection = new SqlConnection(connectionString))
+    {
+        using (SqlCommand command = new SqlCommand(commandText, connection))
+        {
+            connection.Open();
+            var sqlDependency = new SqlDependency(command);
+
+            sqlDependency.OnChange += new OnChangeEventHandler(sqlDependency_OnChange);
+
+            // NOTE: You have to execute the command, or the notification will never fire.
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+            }
+        }
+    }
+}
+</pre>
+<p>
+  Our query, when normally executed, just returns all Products with a name of "Lamp". As a query notification, however, it tells SQL Server that we want to be notified anytime the results of this query would change. This means:
+</p>
+<ol>
+  <li>Any time a new Product with Name = "Lamp" is inserted;
+  </li>
+  <li>Any time an existing Product with Name = "Lamp" changes its name to something other than "Lamp";
+  </li>
+  <li>Any time an existing Product with Name = "Lamp" is deleted;
+  </li>
+  <li>Any time the value of one of the columns <em>in the SELECT statement</em> changes value for a Product with Name = "Lamp".
+  </li>
+</ol>
+<p>
+  The query notification will NOT fire when:
+</p>
+<ol>
+  <li>Any product with Name != "Lamp" is modified, inserted, deleted;
+  </li>
+  <li>Any column not specified in the SELECT statement is modified.
+  </li>
+</ol>
+<h4>
+  Reacting to notifications:
+</h4>
+<pre>
+static void sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
+{
+    Console.WriteLine("Info: {0}; Source: {1}; Type: {2}", e.Info, e.Source, e.Type);
+    RegisterNotification();
+}
+</pre>
+<p>
+  This method will get called anytime the results of our query change, or when an error occurs with registering the query. Notice that we call <code>RegisterNotification</code> again. If we don't, we will never get another update. SQL Server only sends one notification per registration. The <code>SqlNotificationEventArgs</code> contains several helpful properties for debugging issues and for understanding the nature of the change notification. <code>Info</code> is a <code>SqlNotificationInfo</code> enum. This tells what caused the notification, for example, <code>Insert</code>, <code>Update</code>, <code>Delete</code>, <code>Invalid</code>, etc. <code>Source</code> is a <code>SqlNotificationSource</code> enum. This tells whether the notification source is <code>Data</code>, <code>Timeout</code>, <code>Database</code>, etc. This value will be <code>Statement</code> if your statement is not a valid statement for notifications as laid out in <a href="http://msdn.microsoft.com/library/ms181122.aspx">Creating a Query for Notification</a>. <code>Type</code> is a <code>SqlNotificationType</code> enum. This will be <code>Change</code> if the data was modified on the server or <code>Subscribe</code> if there was a failure to create the notification subscription. Note that this will NOT include any result set of any data from the database. It is up to you to go back and re-fetch the data.
+</p>
+<h2>
+  Where is my Entity Framework?!?
+</h2>
+<p>
+  So far, we have just covered the basic implementation of the <code>SqlDependency</code> and not how we plan to make it work with Entity Framework. As you can see from the example above, we just need to convert our Entity Framework expression into a <code>SqlCommand</code> that we can register with a <code>SqlDependency</code>. So, how do we convert:
+</p>
+<pre>
+db.Products.Where(x =&gt; x.Name == "Lamp")
+</pre>
+<p>
+  into:
+</p>
+<pre>
+Select
+    dbo.Products.Id,
+    dbo.Products.Name,
+    dbo.Products.LastEditDate
+From
+    dbo.Products
+Where
+    dbo.Products.Name = 'Lamp'
+</pre>
+<p>
+  When we do something like <code>db.Products.Where(x =&gt; x.Name == "Lamp")</code> we can actually convert that to a <code>DbQuery&lt;Product&gt;</code>. This allows us to get at the base SQL Statement for the query, by just calling <code>.ToString()</code> on the query object:
+</p>
+<pre>
+var db = new StoreDbContext();
+
+var query = db.Products.Where(x =&gt; x.Name == "Lamp") as DbQuery&lt;Product&gt;;
+
+Console.WriteLine(query.ToString());
+</pre>
+<p>
+  This actually returns the following:
+</p>
+<pre>
+SELECT
+[Extent1].[Id] AS [Id],
+[Extent1].[Name] AS [Name],
+[Extent1].[LastEditDate] AS [LastEditDate]
+FROM [dbo].[Products] AS [Extent1]
+WHERE N'Lamp' = [Extent1].[Name]
+</pre>
+<p>
+  This query fits all of the guidelines specified in the <a href="http://msdn.microsoft.com/library/ms181122.aspx">Creating a Query for Notification</a> document, so it will work great. This also means we can change our RegisterNotification method to the following:
+</p>
+<pre>
+static void RegisterNotification()
+{
+    string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+
+    string commandText = null;
+
+    using (var db = new StoreDbContext())
+    {
+        var query = db.Products.Where(x =&gt; x.Name == "Lamp") as DbQuery&lt;Product&gt;;
+
+        commandText = query.ToString();
+    }
+
+    using (SqlConnection connection = new SqlConnection(connectionString))
+    {
+        using (SqlCommand command = new SqlCommand(commandText, connection))
+        {
+            connection.Open();
+
+            var sqlDependency = new SqlDependency(command);
+
+            sqlDependency.OnChange += new OnChangeEventHandler(sqlDependency_OnChange);
+
+            // NOTE: You have to execute the command, or the notification will never fire.
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+            }
+        }
+    }
+}
+</pre>
+<p>
+  Notice now how we are no longer hard coding a string for the SQL command. Instead, we are using the lambda expression <code>x =&gt; x.Name == "Lamp"</code> on the <code>DbContext</code> object to generate the command for us. But what if we want to watch for products other than lamps? Let's change the <code>RegisterNotification</code> method to accept a parameter for the product name:
+</p>
+<pre>
+static void RegisterNotification(string productName)
+{
+    string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+
+    string commandText = null;
+
+    using (var db = new StoreDbContext())
+    {
+        var query = db.Products.Where(x =&gt; x.Name == productName) as DbQuery&lt;Product&gt;;
+
+        commandText = query.ToString();
+    }
+
+    using (SqlConnection connection = new SqlConnection(connectionString))
+    {
+        using (SqlCommand command = new SqlCommand(commandText, connection))
+        {
+            connection.Open();
+
+            var sqlDependency = new SqlDependency(command);
+
+            sqlDependency.OnChange += new OnChangeEventHandler(sqlDependency_OnChange);
+
+            // NOTE: You have to execute the command, or the notification will never fire.
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+            }
+        }
+    }
+}
+</pre>
+<p>
+  Uh-oh. Now when we run the example, we get an error!
+</p>
+<pre>
+Unhandled Exception: System.Data.SqlClient.SqlException: Must declare the scalar variable "@p__linq__0".
+</pre>
+<p>
+  Where did this come from? Well, it turns out that the Entity Framework is smart enough to know that when you specify a hard-coded string in the expression, like <code>x =&gt; x.Name == "Lamp"</code>, the value will never change so it generates a query with the string hard-coded as well. However, when you specify a variable, like <code>x =&gt; x.Name == productName</code>, it takes advantage of <a href="http://msdn.microsoft.com/en-us/library/ms181055.aspx">SQL Execution Plan Caching</a> by creating a paramaterized query, so the query plan can be reused even with the value of <code>productName</code> changes. So, let's take a look at what we are getting now from the <code>DbQuery&lt;Product&gt;.ToString()</code> call:
+</p>
+<pre>
+SELECT
+[Extent1].[Id] AS [Id],
+[Extent1].[Name] AS [Name],
+[Extent1].[LastEditDate] AS [LastEditDate]
+FROM [dbo].[Products] AS [Extent1]
+WHERE [Extent1].[Name] = @p__linq__0
+</pre>
+<p>
+  Just like we thought, it is now using a parameterized query instead of hard-coding the values. Unfortunately, the <code>DbQuery&lt;T&gt;</code> class does not expose what parameters are in the query, other than through the string. Now, from here we have two options. First, we could assume that the parameters are always going to be named <code>@p__linq__N</code>, where <code>N</code> is the index of the parameter in the query. This doesn't seem like a good assumption to me, so we are going to look for another way. The second way of doing it is using reflection to find the parameters themselves. After all, they have to be in there somewhere, even if they aren't exposed. It's not magic, after all.
+</p>
+<p>
+  Unfortunately, this is where the warnings come into play. <em><strong>What follows is NOT supported in any way by the Entity Framework, and may break at ANY TIME.</strong></em>
+</p>
+<p>
+  Well, it turns out that interally, <code>DbQuery&lt;T&gt;</code> relies on a class that is marked as internal to the EntityFramework.dll assembly called <code>InternalDbQuery&lt;T&gt;</code>. Looking at <code>InternalDbQuery&lt;T&gt;</code>, we can see that it relies on the <code>ObjectQuery&lt;T&gt;</code> class to do its heavy lifting. And, it turns out, <code>ObjectQuery&lt;T&gt;</code> derives from <code>ObjectQuery</code>, which has a <code>Parameters</code> property. So, how do we get at this <code>ObjectQuery</code> from the <code>DbQuery&lt;T&gt;</code>? As I said before, we need to use reflection.
+</p>
+<p>
+  First, we get the <code>InternalDbQuery&lt;T&gt;</code> reference:
+</p>
+<pre>
+var internalQuery = query.GetType()
+    .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+    .Where(field =&gt; field.Name == "_internalQuery")
+    .Select(field =&gt; field.GetValue(query))
+    .First();
+</pre>
+<p>
+  And then the <code>ObjectQuery&lt;T&gt;</code> reference:
+</p>
+<pre>
+var objectQuery = internalQuery.GetType()
+    .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+    .Where(field =&gt; field.Name == "_objectQuery")
+    .Select(field =&gt; field.GetValue(internalQuery))
+    .Cast&lt;ObjectQuery&lt;T&gt;&gt;()
+    .First();
+</pre>
+<p>
+  Using this <code>ObjectQuery</code> instance, we can then just iterate through the parameters, adding them to the <code>SqlCommand</code>. So now our <code>RegisterNotification</code> method looks like this:
+</p>
+<pre>
+static void RegisterNotification(string productName)
+{
+    string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+
+    string commandText = null;
+    var parameters = new SqlParameter[0];
+
+    using (var db = new StoreDbContext())
+    {
+        var query = db.Products.Where(x =&gt; x.Name == productName) as DbQuery&lt;Product&gt;;
+
+        commandText = query.ToString();
+
+        var internalQuery = query.GetType()
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(field =&gt; field.Name == "_internalQuery")
+            .Select(field =&gt; field.GetValue(query))
+            .First();
+
+        var objectQuery = internalQuery.GetType()
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(field =&gt; field.Name == "_objectQuery")
+            .Select(field =&gt; field.GetValue(internalQuery))
+            .Cast&lt;ObjectQuery&lt;Product&gt;&gt;()
+            .First();
+
+        parameters = objectQuery.Parameters.Select(x =&gt; new SqlParameter(x.Name, x.Value)).ToArray();
+    }
+
+    using (SqlConnection connection = new SqlConnection(connectionString))
+    {
+        using (SqlCommand command = new SqlCommand(commandText, connection))
+        {
+            connection.Open();
+
+            command.Parameters.AddRange(parameters);
+
+            var sqlDependency = new SqlDependency(command);
+
+            sqlDependency.OnChange += new OnChangeEventHandler(sqlDependency_OnChange);
+
+            // NOTE: You have to execute the command, or the notification will never fire.
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+            }
+        }
+    }
+}
+</pre>
+<p>
+  Now when we run the application, everything works as planned. However, I think we can clean up the code to make it more generic and allow us to reuse this for other queries as well. Let start by creating an extension method for <code>DbQuery&lt;T&gt;</code> to covert it to an <code>ObjectQuery&lt;T&gt;</code>:
+</p>
+<pre>
+public static class DbQueryExtension
+{
+    public static ObjectQuery&lt;T&gt; ToObjectQuery&lt;T&gt;(this DbQuery&lt;T&gt; query)
+    {
+        var internalQuery = query.GetType()
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(field =&gt; field.Name == "_internalQuery")
+            .Select(field =&gt; field.GetValue(query))
+            .First();
+
+        var objectQuery = internalQuery.GetType()
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(field =&gt; field.Name == "_objectQuery")
+            .Select(field =&gt; field.GetValue(internalQuery))
+            .Cast&lt;ObjectQuery&lt;T&gt;&gt;()
+            .First();
+
+        return objectQuery;
+    }
+}
+</pre>
+<p>
+  Now the relevant portion of our <code>RegisterNotification</code> method can turn into the following:
+</p>
+<pre>
+using (var db = new StoreDbContext())
+{
+    var query = db.Products.Where(x =&gt; x.Name == productName) as DbQuery&lt;Product&gt;;
+
+    commandText = query.ToString();
+
+    var objectQuery = query.ToObjectQuery();
+
+    parameters = objectQuery.Parameters.Select(x =&gt; new SqlParameter(x.Name, x.Value)).ToArray();
+}
+</pre>
+<p>
+  But now I think we can take it evern further and create a new extension method for turning a <code>DbQuery&lt;T&gt;</code> directly into a <code>SqlCommand</code>:
+</p>
+<pre>
+public static SqlCommand ToSqlCommand&lt;T&gt;(this DbQuery&lt;T&gt; query)
+{
+    SqlCommand command = new SqlCommand();
+
+    command.CommandText = query.ToString();
+
+    var objectQuery = query.ToObjectQuery();
+
+    foreach (var param in objectQuery.Parameters)
+    {
+        command.Parameters.AddWithValue(param.Name, param.Value);
+    }
+
+    return command;
+}
+</pre>
+<p>
+  This turns our <code>RegisterNotification</code> method into:
+</p>
+<pre>
+static void RegisterNotification(string productName)
+{
+    string connectionString = ConfigurationManager.ConnectionStrings["StoreDbContext"].ConnectionString;
+
+    SqlCommand command;
+
+    using (var db = new StoreDbContext())
+    {
+        var query = db.Products.Where(x =&gt; x.Name == productName) as DbQuery&lt;Product&gt;;
+
+        command = query.ToSqlCommand();
+    }
+
+    using (SqlConnection connection = new SqlConnection(connectionString))
+    {
+        using (command)
+        {
+            command.Connection = connection;
+            connection.Open();
+
+            var sqlDependency = new SqlDependency(command);
+
+            sqlDependency.OnChange += new OnChangeEventHandler(sqlDependency_OnChange);
+
+            // NOTE: You have to execute the command, or the notification will never fire.
+            using (SqlDataReader reader = command.ExecuteReader())
+            {
+            }
+        }
+    }
+}
+</pre>
+<p>
+  This is great, but we are still hard coding a query against the Products <code>DbSet</code> on our <code>DbContext</code>. To get around this, lets create a new generic class that we can use to register queries for notifications.
+</p>
+<h2>
+  EntityChangeNotifier
+</h2>
+<p>
+  So, here is our first pass at moving all of the above into its own class:
+</p>
+<pre>
+public class EntityChangeNotifier&lt;TEntity, TDbContext&gt;
+    : IDisposable
+    where TEntity : class
+    where TDbContext : DbContext, new()
+{
+    private DbContext _context;
+    private Expression&lt;Func&lt;TEntity, bool&gt;&gt; _query;
+    private string _connectionString;
+
+    public EntityChangeNotifier(Expression&lt;Func&lt;TEntity, bool&gt;&gt; query)
+    {
+        _context = new TDbContext();
+        _query = query;
+        _connectionString = _context.Database.Connection.ConnectionString;
+
+        SqlDependency.Start(_connectionString);
+        RegisterNotification();
+    }
+
+    private void RegisterNotification()
+    {
+        _context = new TDbContext();
+
+        using (SqlConnection connection = new SqlConnection(_connectionString))
+        {
+            using (SqlCommand command = GetCommand())
+            {
+                command.Connection = connection;
+                connection.Open();
+
+                var sqlDependency = new SqlDependency(command);
+                sqlDependency.OnChange += new OnChangeEventHandler(_sqlDependency_OnChange);
+
+                // NOTE: You have to execute the command, or the notification will never fire.
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                }
+            }
+        }
+    }
+
+    private SqlCommand GetCommand()
+    {
+        var q = GetCurrent();
+
+        return q.ToSqlCommand();
+    }
+
+    private DbQuery&lt;TEntity&gt; GetCurrent()
+    {
+        var query = _context.Set&lt;TEntity&gt;().Where(_query) as DbQuery&lt;TEntity&gt;;
+
+        return query;
+    }
+
+    private void _sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
+    {
+        Console.WriteLine("Info: {0}; Source: {1}; Type: {2}", e.Info, e.Source, e.Type);
+        RegisterNotification();
+    }
+
+    public void Dispose()
+    {
+        SqlDependency.Stop(_connectionString);
+    }
+}
+</pre>
+<p>
+  As you can see, our <code>EntityChangeNotifier</code> class takes two generic parameters, the first is the entity type and the second is the <code>DbContext</code> type. We are also using <code>IDisposable</code> to allow us to use the <code>using</code> syntax to start and stop the <code>SqlDependency</code> for the connection string. This allows us to write the following:
+</p>
+<pre>
+using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(x =&gt; x.Name == "Lamp"))
+{
+    Console.WriteLine("Press any key to stop listening for changes...");
+    Console.ReadKey(true);
+}
+</pre>
+<p>
+  That's great, but now we need to do something with the event that gets fired when the change notification occurs. Let's create some events of our own on the <code>EntityChangeNotifier</code> class. First, the <code>EventArgs</code> classes:
+</p>
+<pre>
+public class EntityChangeEventArgs&lt;T&gt; : EventArgs
+{
+    public IEnumerable&lt;T&gt; Results { get; set; }
+    public bool ContinueListening { get; set; }
+}
+
+public class NotifierErrorEventArgs : EventArgs
+{
+    public string Sql { get; set; }
+    public SqlNotificationEventArgs Reason { get; set; }
+}
+</pre>
+<p>
+  And then our event declarations:
+</p>
+<pre>
+public event EventHandler&lt;EntityChangeEventArgs&lt;TEntity&gt;&gt; Changed;
+public event EventHandler&lt;NotifierErrorEventArgs&gt; Error;
+</pre>
+<p>
+  And then our <code>OnEvent</code> methods:
+</p>
+<pre>
+protected virtual void OnChanged(EntityChangeEventArgs&lt;TEntity&gt; e)
+{
+    if (Changed != null)
+    {
+        Changed(this, e);
+    }
+}
+
+protected virtual void OnError(NotifierErrorEventArgs e)
+{
+    if (Error != null)
+    {
+        Error(this, e);
+    }
+}
+</pre>
+<p>
+  And now we can change our <code>SqlDependency</code> event handler to:
+</p>
+<pre>
+private void _sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
+{
+    if (e.Type == SqlNotificationType.Subscribe || e.Info == SqlNotificationInfo.Error)
+    {
+        var args = new NotifierErrorEventArgs
+        {
+            Reason = e,
+            Sql = GetCurrent().ToString()
+        };
+
+        OnError(args);
+    }
+    else
+    {
+        var args = new EntityChangeEventArgs&lt;TEntity&gt;
+        {
+            Results = GetCurrent(),
+            ContinueListening = true
+        };
+
+        OnChanged(args);
+
+        if (args.ContinueListening)
+        {
+            RegisterNotification();
+        }
+    }
+}
+</pre>
+<p>
+  Now we are checking if the event is fired because of an error or a change. If it is an error, we fire our own <code>Error</code> event. If it is a change, we fire our <code>Changed</code> event. We even include the <code>IEnumerable&lt;T&gt;</code> results from the query in our <code>EventArgs</code> class, so the consuming method can get the results directly. This allows us to do the following:
+</p>
+<pre>
+using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(x =&gt; x.Name == "Lamp"))
+{
+    notifer.Changed += (sender, e) =&gt;
+    {
+        Console.WriteLine(e.Results.Count());
+    };
+
+    Console.WriteLine("Press any key to stop listening for changes...");
+    Console.ReadKey(true);
+}
+</pre>
+<p>
+  Hooray! Looks like everything is working great! Well... almost. Let's see what happens when we do the following:
+</p>
+<pre>
+using (var notifer = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(x =&gt; x.Name == "Lamp"))
+{
+    notifer.Changed += (sender, e) =&gt;
+    {
+        Console.WriteLine(e.Results.Count());
+    };
+
+    using (var otherNotifier = new EntityChangeNotifier&lt;Product, StoreDbContext&gt;(x =&gt; x.Name == "Desk"))
+    {
+        otherNotifier.Changed += (sender, e) =&gt;
+        {
+            Console.WriteLine(e.Results.Count());
+        };
+
+        Console.WriteLine("Press any key to stop listening for changes...");
+        Console.ReadKey(true);
+    }
+
+    Console.WriteLine("Press any key to stop listening for changes...");
+    Console.ReadKey(true);
+}
+</pre>
+<p>
+  If you run the application now, you should see it print the total count of each type of product any time you make a change to that product in the database. Go ahead and run some queries directly on the database, like:
+</p>
+<pre>
+INSERT INTO Products (Name, LastEditDate) Values ('Lamp', GetDate())
+INSERT INTO Products (Name, LastEditDate) Values ('Desk', GetDate())
+</pre>
+<p>
+  Now press any key to close out the monitoring of the "Desk" notifier. Now run the insert statement for the desk again. What happened? We still got the notification! This tells us something important. Namely, that internally, <code>SqlDependency</code> keeps track of all the places the <code>Start</code> method was called (probably just a counter) and only stops listening when <code>Stop</code> has been called an equal number of times. We can fix this by maintaining and checking the state inside the <code>EntityChangeNotification</code> class itself. Let's change the <code>Dispose</code> method to not only call the <code>SqlDependency.Stop</code> method, but also to dispose of the <code>DbContext</code> instance as well:
+</p>
+<pre>
+public void Dispose()
+{
+    SqlDependency.Stop(_connectionString);
+
+    if (_context != null)
+    {
+        _context.Dispose();
+        _context = null;
+    }
+}
+</pre>
+<p>
+  Now we can check in the <code>SqlDependency</code> event handler whether <code>_context</code> is <code>null</code>, and if so, just return:
+</p>
+<pre>
+private void _sqlDependency_OnChange(object sender, SqlNotificationEventArgs e)
+{
+    if (_context == null)
+        return;
+    .
+    .
+    .
+}
+</pre>
+<p>
+  Now, let's try it again. Now after closing out the "Desk" notifier, we no longer receive notifications when the "Desk" rows change. And since we don't re-register the notification, it only happens once.
+</p>
+<h2>
+  Points of Interest
+</h2>
+<p>
+  The beauty of this approach is that we can get instant notifications sent to our application when data changes in the database, without having to poll the database every x seconds. It won't work with every query, and the limits applied by the SQL Server team as to what queries can trigger notifications are strict, but when it can be used it provides a much better way for your application to respond to data changes than just relying on polling. You should also read the MSDN documentation on the SqlDependency class, including the notes about how it was intended to be used. Specifically the notes about how it was (emphasis mine):
+</p>
+<blockquote>
+  <p>
+    ...designed to be used in ASP.NET or middle-tier services where there is a <em><strong>relatively small number of servers having dependencies active against the database</strong></em>. It was <em><strong>not designed for use in client applications, where hundreds or thousands of client computers would have SqlDependency objects</strong></em> set up for a single database server. If you are developing an application where you need reliable sub-second notifications when data changes, review the sections Planning an Efficient Query Notifications Strategy and Alternatives to Query Notifications in the Planning for Notifications topic in SQL Server Books Online.
+  </p>
+</blockquote>
+<p>
+  Do keep these notes in mind when deciding whether SqlDependency is the right approach for your application.
+</p>
+<h2>
+  History
+</h2>
+<p>
+  November 2012 - First Release
+</p>
