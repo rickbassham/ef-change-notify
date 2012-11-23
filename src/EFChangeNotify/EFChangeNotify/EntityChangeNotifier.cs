@@ -4,9 +4,42 @@ using System.Data.Entity.Infrastructure;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Collections.Generic;
 
 namespace EFChangeNotify
 {
+    internal static class EntityChangeNotifier
+    {
+        private static List<string> _connectionStrings;
+        private static object _lockObj = new object();
+
+        static EntityChangeNotifier()
+        {
+            _connectionStrings = new List<string>();
+
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            {
+                foreach (var cs in _connectionStrings)
+                    SqlDependency.Stop(cs);
+            };
+        }
+
+        internal static void AddConnectionString(string cs)
+        {
+            if (!_connectionStrings.Contains(cs))
+            {
+                lock (_lockObj)
+                {
+                    if (!_connectionStrings.Contains(cs))
+                    {
+                        SqlDependency.Start(cs);
+                        _connectionStrings.Add(cs);
+                    }
+                }
+            }
+        }
+    }
+
     public class EntityChangeNotifier<TEntity, TDbContext>
         : IDisposable
         where TDbContext : DbContext, new()
@@ -25,7 +58,7 @@ namespace EFChangeNotify
             _query = query;
             _connectionString = _context.Database.Connection.ConnectionString;
 
-            SafeCountDictionary.Increment(_connectionString, x => { SqlDependency.Start(x); });
+            EntityChangeNotifier.AddConnectionString(_connectionString);
 
             RegisterNotification();
         }
@@ -125,8 +158,6 @@ namespace EFChangeNotify
         {
             if (disposing)
             {
-                SafeCountDictionary.Decrement(_connectionString, x => { SqlDependency.Stop(x); });
-
                 if (_context != null)
                 {
                     _context.Dispose();
