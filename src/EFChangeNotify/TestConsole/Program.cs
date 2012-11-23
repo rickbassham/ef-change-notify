@@ -3,6 +3,7 @@ using System.Linq;
 using EFChangeNotify;
 using TestConsole.Models;
 using System.Data.Entity.Infrastructure;
+using System.Threading;
 
 namespace TestConsole
 {
@@ -11,6 +12,22 @@ namespace TestConsole
         static void Main(string[] args)
         {
             string productName = "Lamp";
+
+            using (var cache = new EntityCache<Product, StoreDbContext>(p => p.Name == "Lamp"))
+            {
+                Console.WriteLine("Press any key to stop listening for changes...");
+
+                while (true)
+                {
+                    Console.WriteLine(cache.Results.Count());
+                    Thread.Sleep(1000);
+
+                    if (Console.KeyAvailable)
+                        break;
+                }
+            }
+
+            return;
 
             using (var notifer = new EntityChangeNotifier<Product, StoreDbContext>(p => p.Name == productName))
             {
