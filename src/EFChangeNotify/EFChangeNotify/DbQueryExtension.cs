@@ -3,7 +3,6 @@ using System.Data.Objects;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
-using System;
 
 namespace EFChangeNotify
 {
