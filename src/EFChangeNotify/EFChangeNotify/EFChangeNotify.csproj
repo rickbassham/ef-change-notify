@@ -38,6 +38,7 @@
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.Entity" />
+    <Reference Include="System.Runtime.Caching" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -46,6 +47,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DbQueryExtension.cs" />
+    <Compile Include="EntityCache.cs" />
+    <Compile Include="EntityChangeMonitor.cs" />
     <Compile Include="EntityChangeNotifier.cs" />
     <Compile Include="EntityChangeEventArgs.cs" />
     <Compile Include="NotifierErrorEventArgs.cs" />
