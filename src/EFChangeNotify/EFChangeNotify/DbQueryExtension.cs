@@ -1,5 +1,5 @@
-﻿using System.Data.Entity.Infrastructure;
-using System.Data.Objects;
+﻿using System.Data.Entity.Core.Objects;
+using System.Data.Entity.Infrastructure;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
@@ -28,8 +28,7 @@ namespace EFChangeNotify
 
         public static SqlCommand ToSqlCommand<T>(this DbQuery<T> query)
         {
-            SqlCommand command = new SqlCommand();
-
+            var command = new SqlCommand();
             command.CommandText = query.ToString();
 
             var objectQuery = query.ToObjectQuery();
@@ -51,7 +50,7 @@ namespace EFChangeNotify
 
         public static string ToTraceStringWithParameters<T>(this ObjectQuery<T> query)
         {
-            string traceString = query.ToTraceString() + "\n";
+            var traceString = query.ToTraceString() + "\n";
 
             foreach (var parameter in query.Parameters)
             {
